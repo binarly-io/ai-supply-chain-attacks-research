@@ -1,4 +1,4 @@
-# A Taxonomy of Static-Scanner Evasion Techniques
+# Taxonomy of Static-Scanner Evasion Techniques
 
 We systematically categorized static scanner evasion techniques by method. This survey was conducted as of February 25, 2026. The target scanners are Protect AI, JFrog, and ClamAV on Hugging Face, as well as the open-source SaferPickle and ModelScan. The open-source scanners used were the latest versions available at that time: ModelScan 0.8.8 and SaferPickle (commit 88564e07dbefff58d1bc7571cce01accd394b102). Allowlist-based scanners (fickling and HF PickleScan) are excluded, and VirusTotal is also excluded due to its extremely low detection rate.
 
@@ -6,7 +6,7 @@ The Python code shown in this section is decompiled from pickle files (or pickle
 
 ## Overview
 
-The table below summarizes each evasion technique's novelty and per-scanner detection result. "Concept known" means the high-level concept appears in prior work, but the specific techniques listed below are new. "Known" means the technique itself was previously documented (see inline references in each section). "D" (Detected) means the scanner flags the sample. "E" (Evaded) means it does not. "P (X/8)" (Partial) appears only for the Obfuscation row, indicating X out of 8 samples were flagged.
+The table below summarizes each evasion technique's novelty and per-scanner detection result. "Concept known" means the high-level concept appears in prior work, but the specific techniques listed below are new. "Known" means the technique itself was previously documented (see inline references in each section). "D" (Detected) means the scanner flags the sample. "E" (Evaded) means it does not. "P (X/8)" (Partial) appears only for the Obfuscation row, indicating X out of 8 samples were flagged. "D (downgraded)" means the scanner still flags the sample but lowers its severity rating; this appears only for the CodeType/FunctionType: Indirect Variant row, where SaferPickle reports `suspicious` instead of its highest `unsafe` rating.
 
 Note that the novelty assessment in this section is based on publicly available papers, advisories, and technical articles found online. The search was best-effort, and unidentified prior work may exist, so the assessment is not definitive.
 
@@ -15,26 +15,28 @@ Note that the novelty assessment in this section is based on publicly available 
 | 1 | [Alternative Execution Primitives (3 command-execution examples)](#alternative-execution-primitives) | Concept known | E | E | E | E | E |
 | 2 | [Alternative Execution Primitives (external communication: pandas.read_csv)](#alternative-execution-primitives) | Concept known | D | E | E | E | E |
 | 3 | [Nested Deserialization (YAML)](#nested-deserialization-variant) | Concept known | E | D | E | D | E |
-| 4 | [Nested Deserialization (Pickle)](#nested-deserialization-variant) | Concept known | E | E | D | D | E |
+| 4 | [Nested Deserialization (Pickle)](#nested-deserialization-variant) | Known | E | E | D | D | E |
 | 5 | [Scanner-side Parsing: zipfile Exceptions](#zipfile-exceptions) | Known | D | E | D | E | E |
 | 6 | [Scanner-side Parsing: pickletools Exceptions](#pickletools-exceptions) | Known | D | D | D | E | E |
-| 7 | [Scanner-side Parsing: Invalid Memo Reference](#invalid-memo-reference) | Concept known | D | E | D | D | E |
+| 7 | [Scanner-side Parsing: Invalid Memo Reference](#invalid-memo-reference) | Known | D | E | D | D | E |
 | 8 | [Scanner-side Parsing: Type-Confused Stack (bytes)](#type-confused-stack-operands) | Concept known | D | E | E | D | E |
 | 9 | [Scanner-side Parsing: Type-Confused Stack (int)](#type-confused-stack-operands) | Concept known | D | E | D | D | E |
-| 10 | [Scanner-side Parsing: Unhashable Type on Stack](#unhashable-type-on-stack) | Concept known | D | E | D | D | E |
+| 10 | [Scanner-side Parsing: Unhashable Type on Stack](#unhashable-type-on-stack) | Known | D | E | D | D | E |
 | 11 | [Obfuscation](#obfuscation) | Concept known | P (2/8) | P (3/8) | P (1/8) | P (2/8) | P (3/8) |
-| 12 | [Pickle's Python 2 Compatibility Mapping](#pickles-python-2-compatibility-mapping) | Novel | E | E | E | D | E |
+| 12 | [Pickle's Python 2 Compatibility Mapping](#pickles-python-2-compatibility-mapping) | Concept known | E | E | E | D | E |
 | 13 | [CodeType/FunctionType: Basic](#codetypefunctiontype-construction) | Concept known | E | E | E | D | E |
-| 14 | [CodeType/FunctionType: Indirect Variant](#indirect-variant) | Concept known | E | E | E | D (downgraded) | E |
-| 15 | [CodeType/FunctionType: Marshal Variant](#marshal-variant) | Known | E | E | D | D | E |
-| 16 | [Uncommon Opcodes: EXT2 + copyreg.add_extension](#ext2-opcode-with-copyregadd_extension) | Concept known | E | E | E | D | E |
+| 14 | [CodeType/FunctionType: Marshal Variant](#marshal-variant) | Known | E | E | D | D | E |
+| 15 | [CodeType/FunctionType: Indirect Variant](#indirect-variant) | Novel | E | E | E | D (downgraded) | E |
+| 16 | [Uncommon Opcodes: EXT2 + copyreg.add_extension](#ext2-opcode-with-copyregadd_extension) | Novel | E | E | E | D | E |
 | 17 | [Uncommon Opcodes: INST + Memo Indirection](#inst-opcode-with-memo-indirection) | Concept known | E | E | E | D | E |
 | 18 | [Python Introspection Chain](#python-introspection-chain) | Concept known | E | E | E | D | E |
 | 19 | [Indirect Model Loading](#indirect-model-loading) | Known | D | D | E | E | E |
 | 20 | [File Extension and Format Mismatch](#file-extension-and-format-mismatch) | Known | D | E | D | D | E |
 | 21 | [Old Format](#old-format) | Known | D | E | D | D | E |
 
-What emerges from this detailed survey is the inherent limitation of static-scanner pattern matching. Even when an evasion technique is conceptually known, no scanner covers every concrete variant. Moreover, even fully known techniques previously published in prior work are still missed by multiple scanners.
+In this survey, only two techniques ([CodeType/FunctionType: Indirect Variant](#indirect-variant) and [Uncommon Opcodes: EXT2 + copyreg.add_extension](#ext2-opcode-with-copyregadd_extension)) were novel at the conceptual level. Most were either Concept known (10 techniques) or Known (9 techniques).
+
+The key takeaway from this survey is the inherent limitation of static-scanner pattern matching. Even when an evasion technique is conceptually known, no scanner covers every concrete variant. Moreover, even fully known techniques previously published in prior work are still missed by multiple scanners.
 
 ## Alternative Execution Primitives
 
@@ -84,7 +86,9 @@ from torch.storage import _load_from_bytes
 _var0 = _load_from_bytes(b"\x80\x04cbuiltins\nexec\n(\x8c\x19import os;os.system('ls')tR...")
 ```
 
-YAML unsafe deserialization is a well-known security issue. The PyYAML [documentation](https://pyyaml.org/wiki/PyYAMLDocumentation) itself notes that `yaml.load` is as powerful as `pickle.load` and can call any Python function. However, we have not found public references for the evasion technique that exploits pickle-based model scanners' failure to recursively parse nested YAML payloads or second-stage pickle payloads, particularly the `torch.storage._load_from_bytes` variant.
+YAML unsafe deserialization is a well-known security issue. The PyYAML [documentation](https://pyyaml.org/wiki/PyYAMLDocumentation) itself notes that `yaml.load` is as powerful as `pickle.load` and can call any Python function. However, we have not found public references for the evasion technique that exploits pickle-based model scanners' failure to recursively parse nested YAML payloads.
+
+The pickle variant is known: Promptfoo's ModelAudit release [post](https://www.promptfoo.dev/blog/open-sourcing-modelaudit/), published after our February 25, 2026 survey date, describes `torch.storage._load_from_bytes` via `REDUCE` as a dangerous deserialization pattern missed by existing scanners.
 
 ## Scanner-side Parsing Path Exceptions
 
@@ -132,6 +136,8 @@ This technique was first reported by [ReversingLabs](https://www.reversinglabs.c
 ### Scanner-Specific Exceptions
 
 These samples do not corrupt the opcode stream itself. Instead, they append deliberately malformed operands after the malicious `GLOBAL` + `REDUCE` payload, triggering unhandled exceptions in the scanners' own `STACK_GLOBAL` resolution logic. The payload executes at `REDUCE` before the malformed tail is ever reached by the pickle runtime.
+
+The Hugging Face repositories used for the examples in this subsection appear to have been uploaded by the Cisco AI Defense researchers who published a later [write-up](https://blogs.cisco.com/ai/hardening-pickle-file-scanners) on hardening pickle scanners with structure-aware fuzzing. The write-up describes related scanner-crash samples and notes that such PoCs were generated and uploaded to Hugging Face for automated scanning.
 
 #### Invalid Memo Reference
 
@@ -245,6 +251,8 @@ _var0 = run(['echo "Malicious PyTorch model executed!"'])
 
 In `Unpickler.find_class`, if `protocol` < 3 and `fix_imports` is `True`, the pickle module [uses](https://github.com/python/cpython/blob/main/Lib/pickle.py#L1716) `_compat_pickle.IMPORT_MAPPING` to remap module names. As a result, `commands` gets [mapped](https://github.com/python/cpython/blob/main/Lib/_compat_pickle.py#L44C6-L44C14) to `subprocess`.
 
+We did not find this scanner-evasion technique in English-language papers or technical articles, but the underlying compatibility-mapping behavior was mentioned in a Chinese CTF [writeup](https://www.caterpie771.cn/archives/482).
+
 This evasion technique is effective against all scanners except SaferPickle.
 
 ## CodeType/FunctionType Construction
@@ -257,6 +265,18 @@ from types import FunctionType
 from types import CodeType
 _var0 = CodeType(0, 0, 0, 1, 3, 67, b'd\x01d\x00l\x00}\x00|\x00\xa0\x01d\x02\xa1\x01\x01\x00d\x00S\x00', (None, 0, 'echo pwned > pwned_stealthy.txt'), ('os', 'system'), ('os',), '/home/tanming/malware_model_format/pickleCloak_new/generate_stealthy.py', 'payload_func', 11, b'\x08\x01\x0e\x01', (), ())
 _var1 = FunctionType(_var0, {})
+```
+
+### Marshal Variant
+
+Instead of constructing a code object directly with `CodeType`, this variant uses `marshal.loads` to deserialize a pre-built code object from raw bytes. The malicious bytecode is opaque to scanners since it is embedded in the serialized blob rather than appearing as explicit `CodeType` arguments. This variant was originally documented by [Trail of Bits](https://blog.trailofbits.com/2024/06/11/exploiting-ml-models-with-pickle-file-attacks-part-2/) and still evades Protect AI, JFrog, and ModelScan.
+
+```python
+from types import FunctionType
+from marshal import loads
+_var0 = loads(b'\xe3\x00...')
+_var1 = FunctionType(_var0, {})
+_var2 = _var1()
 ```
 
 ### Indirect Variant
@@ -275,19 +295,9 @@ _var4 = _var3(0, 0, 0, 1, 3, 67, b'd\x01d\x00l\x00}\x00|\x00\xa0\x01d\x02\xa1\x0
 _var5 = _var0(_var4, {})
 ```
 
-Any regular Python function can serve as the donor; `copy.copy` is used here, but the choice is arbitrary. This evades static scanners that rely on detecting `from types import CodeType/FunctionType` as a signature. SaferPickle still detects this variant, but downgrades the result from `unsafe` to `suspicious`.
+Any regular Python function can serve as the donor; `copy.copy` is used here, but the choice is arbitrary. Compared with the Marshal Variant, this is more evasive because it does not require explicit imports of `FunctionType` or `marshal.loads`, and derives both constructor types from ordinary runtime objects. SaferPickle still detects this variant, but downgrades the result from `unsafe` to `suspicious`.
 
-### Marshal Variant
-
-Instead of constructing a code object directly with `CodeType`, this variant uses `marshal.loads` to deserialize a pre-built code object from raw bytes. The malicious bytecode is opaque to scanners since it is embedded in the serialized blob rather than appearing as explicit `CodeType` arguments. This variant was originally documented by [Trail of Bits](https://blog.trailofbits.com/2024/06/11/exploiting-ml-models-with-pickle-file-attacks-part-2/) and still evades Protect AI, JFrog, and ModelScan.
-
-```python
-from types import FunctionType
-from marshal import loads
-_var0 = loads(b'\xe3\x00...')
-_var1 = FunctionType(_var0, {})
-_var2 = _var1()
-```
+We did not find prior public work describing this specific scanner-evasion pattern: deriving the `CodeType` and `FunctionType` constructor types from ordinary runtime objects instead of importing them by name.
 
 ## Uncommon Opcodes
 
@@ -316,12 +326,16 @@ The payload first calls `copyreg.add_extension` to register `spawnv_passfds` und
 appears in a `GLOBAL` or `STACK_GLOBAL` opcode, pattern-based scanners do not flag it. Fickling fails to parse this payload entirely, raising `NotImplementedError: TODO: Add
 support for Opcode EXT2`.
 
+Although the EXT opcode family and copyreg extension registry are [documented Python mechanisms](https://peps.python.org/pep-0307/), we did not find prior public security research independently documenting this exact scanner-evasion pattern. A later [Hugging Face repository](https://huggingface.co/hacnho/model-format-bypass-pickle-ext-copyreg/tree/main) describes essentially the same EXT2 + in-stream `copyreg.add_extension` bypass, but it was uploaded about three months after our [ModelScan disclosure](https://github.com/protectai/modelscan/issues/338) on March 23, 2026, so we do not treat it as independent prior work.
+
 This evasion technique is effective against all scanners except SaferPickle.
 
 ### `INST` Opcode with Memo Indirection
 
 This technique uses the `INST` opcode — an old protocol 0 instruction rarely seen in modern pickle files — to dynamically construct the target module name and pass it to
 `STACK_GLOBAL` through the memo, bypassing pattern-based detection.
+
+The use of the `INST` opcode itself as a dangerous-global detection bypass was previously reported in a Picklescan [issue](https://github.com/mmaitre314/picklescan/issues/13), although that report did not use the memo-indirection pattern shown here.
 
 ```python
    0: PROTO           4
