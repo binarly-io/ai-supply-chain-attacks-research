@@ -34,7 +34,7 @@ Note that the novelty assessment in this section is based on publicly available 
 | 20 | [File Extension and Format Mismatch](#file-extension-and-format-mismatch) | Known | D | E | D | D | E |
 | 21 | [Old Format](#old-format) | Known | D | E | D | D | E |
 
-In this survey, only two techniques ([CodeType/FunctionType: Indirect Variant](#indirect-variant) and [Uncommon Opcodes: EXT2 + copyreg.add_extension](#ext2-opcode-with-copyregadd_extension)) were novel at the conceptual level. Most were either Concept known (10 techniques) or Known (9 techniques).
+In this survey, only two techniques ([CodeType/FunctionType: Indirect Variant](#indirect-variant) and [Uncommon Opcodes: EXT2 + copyreg.add_extension](#ext2-opcode-with-copyregadd_extension)) were classified as Novel. Most were either Concept known (10 techniques) or Known (9 techniques).
 
 The key takeaway from this survey is the inherent limitation of static-scanner pattern matching. Even when an evasion technique is conceptually known, no scanner covers every concrete variant. Moreover, even fully known techniques previously published in prior work are still missed by multiple scanners.
 
