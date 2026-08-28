@@ -1,6 +1,6 @@
 # MLTracer: Syscall-Based Malicious Model Detection and Labeling, with Static-Scanner Evasion Taxonomy
 
-Blog post: TBD
+Blog post: https://www.binarly.io/blog/malicious-model-detection-mltracer.
 
 ## Files
 
